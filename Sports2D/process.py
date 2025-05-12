@@ -1664,6 +1664,57 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
                 valid_Y.append(person_Y)
                 valid_scores.append(person_scores)
 
+            # ----- START: Added code for Unity callback -----
+            # Prepare data structure for the current frame
+            # Use frame_count instead of frame_nb as frame_nb might not be continuous if skipping frames
+            current_frame_index = frame_count - 1 # frame_count increments *after* read
+            
+            # Calculate current time directly within the loop
+            # Ensure fps is not zero to avoid division error
+            if fps > 0:
+                # Time relative to the start of the processing range
+                current_time = (current_frame_index - frame_range[0]) / fps 
+            else:
+                current_time = None # Or handle as appropriate if fps is invalid
+            
+            # The old calculation based on all_frames_time (removed):
+            # current_time = all_frames_time.iloc[current_frame_index - frame_range[0]] if not all_frames_time.empty and current_frame_index >= frame_range[0] and (current_frame_index - frame_range[0]) < len(all_frames_time) else None 
+
+            frame_data_for_unity = {
+                'frame': current_frame_index, 
+                'time': current_time,
+                'persons': []
+            }
+
+            # Assuming valid_X, valid_Y, valid_scores, valid_angles are lists 
+            # where each element corresponds to a detected person for this frame
+            num_persons_in_frame = len(valid_X)
+            for p_idx in range(num_persons_in_frame): 
+                # Ensure data exists for this person before accessing
+                person_data = {
+                    'keypoints_x': valid_X[p_idx].tolist() if hasattr(valid_X[p_idx], 'tolist') else valid_X[p_idx], 
+                    'keypoints_y': valid_Y[p_idx].tolist() if hasattr(valid_Y[p_idx], 'tolist') else valid_Y[p_idx],
+                    'scores': valid_scores[p_idx].tolist() if hasattr(valid_scores[p_idx], 'tolist') else valid_scores[p_idx],
+                }
+                # Add angles only if calculated and available for this person
+                if calculate_angles and p_idx < len(valid_angles):
+                     person_data['angles'] = (valid_angles[p_idx].tolist() if hasattr(valid_angles[p_idx], 'tolist') else valid_angles[p_idx])
+                else:
+                     person_data['angles'] = [] # Ensure key exists even if no angles
+
+                frame_data_for_unity['persons'].append(person_data)
+
+            # Check for and call the Unity callback function passed in config
+            unity_callback = config_dict.get('process_callback_for_unity')
+            if unity_callback and callable(unity_callback):
+                try:
+                    unity_callback(frame_data_for_unity)
+                except Exception as e:
+                    # Use logging if available, otherwise print
+                    log_func = logging.error if 'logging' in sys.modules else print
+                    log_func(f"Error calling Unity callback: {e}")
+            # ----- END: Added code for Unity callback -----
+
             # Draw keypoints and skeleton
             if show_realtime_results:
                 img = frame.copy()
