@@ -1,0 +1,30 @@
+# Configuration for the Sports2D Unity Bridge
+
+# These settings will override the DEFAULT_CONFIG from the Sports2D package
+# when running the Unity bridge.
+
+[base]
+video_input = "webcam"        # Use 'webcam' or a video file path
+show_realtime_results = false # Sports2D's own GUI is not needed by the bridge
+calculate_angles = true
+nb_persons_to_detect = 1      # Example: detect 1 person
+result_dir = "Sports2D_Results_Bridge" # Specify a results directory for any bridge-specific outputs (if any were saved)
+
+# Settings to reduce memory accumulation and disable Sports2D saving/post-processing features
+# as the bridge handles data per frame.
+person_ordering_method = "first_detected" # Avoids storing all raw frames for 'on_click'
+save_vid = false              
+save_img = false              
+save_pose = false             # Avoids accumulating all pose data for end-of-session TRC
+save_angles = false           # Avoids accumulating all angle data for end-of-session MOT
+
+# New flag to control data accumulation for the bridge
+disable_internal_data_accumulation = true 
+
+[pose]
+det_frequency = 5             # Example: run detection less frequently
+
+[post-processing] # If not saving pose/angles, we might not need these extensive post-processing steps
+interpolate = false 
+filter = false
+show_graphs = false 

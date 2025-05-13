@@ -1715,7 +1715,25 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
                     log_func(f"Error calling Unity callback: {e}")
             # ----- END: Added code for Unity callback -----
 
-            # Draw keypoints and skeleton
+            # --- START: Conditional accumulation based on new flag --- 
+            # Check the new flag from config_dict
+            # Default to False if the flag isn't present, to maintain original Sports2D behavior
+            disable_accumulation = config_dict.get('base', {}).get('disable_internal_data_accumulation', False)
+
+            if not disable_accumulation:
+                all_frames_X.append(np.array(valid_X))
+                all_frames_X_flipped.append(np.array(valid_X_flipped)) 
+                all_frames_Y.append(np.array(valid_Y))
+                all_frames_scores.append(np.array(valid_scores))
+                
+                # This one is already conditional on save_angles, which is good.
+                # We ensure it's also under the main accumulation flag if desired for clarity,
+                # though save_angles=False from bridge config would prevent it anyway.
+                if save_angles and calculate_angles:
+                    all_frames_angles.append(np.array(valid_angles))
+            # --- END: Conditional accumulation based on new flag ---
+            
+            # Original drawing code for show_realtime_results (if it were true)
             if show_realtime_results:
                 img = frame.copy()
                 cv2.putText(img, f"Press 'q' to stop", (cam_width-int(600*fontSize), cam_height-20), cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, (255,255,255), thickness+1, cv2.LINE_AA)
@@ -1728,17 +1746,6 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
                 cv2.imshow(f'{video_file} Sports2D', img)
                 if (cv2.waitKey(1) & 0xFF) == ord('q') or (cv2.waitKey(1) & 0xFF) == 27:
                     break
-
-            all_frames_X.append(np.array(valid_X))
-            all_frames_X_flipped.append(np.array(valid_X_flipped))
-            all_frames_Y.append(np.array(valid_Y))
-            all_frames_scores.append(np.array(valid_scores))
-            
-            if save_angles and calculate_angles:
-                all_frames_angles.append(np.array(valid_angles))
-            if video_file=='webcam' and save_vid:   # To adjust framerate of output video
-                elapsed_time = (datetime.now() - start_time).total_seconds()
-                frame_processing_times.append(elapsed_time)
 
         # End of the video is reached
         cap.release()

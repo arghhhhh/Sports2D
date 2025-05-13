@@ -3,6 +3,7 @@ import json
 import threading
 import copy # Needed for deepcopy
 import logging # For better logging
+import toml # For loading the .toml config file
 
 # Import Sports2D and its DEFAULT_CONFIG
 from Sports2D import Sports2D
@@ -125,6 +126,12 @@ def process_with_unity(initial_config_overrides):
     for key, value in pose_overrides.items():
         config_dict['pose'][key] = value
 
+    # Apply post-processing overrides
+    if 'post-processing' not in config_dict: config_dict['post-processing'] = {}
+    post_processing_overrides = initial_config_overrides.get('post-processing', {})
+    for key, value in post_processing_overrides.items():
+        config_dict['post-processing'][key] = value
+
     # Ensure 'logging' section exists and set custom logging to False for Sports2D
     # so bridge can handle its own logging.
     if 'logging' not in config_dict: config_dict['logging'] = {}
@@ -167,25 +174,48 @@ def process_with_unity(initial_config_overrides):
 
 
 if __name__ == "__main__":
-    our_config_overrides = {
-        'base': {
-            'video_input': 'webcam',        # Use 'webcam' or a video file path
-            'show_realtime_results': False, # Sports2D's own GUI is not needed
-            'calculate_angles': True,
-            'nb_persons_to_detect': 1,      # Example: detect 1 person
-            'result_dir': 'Sports2D_Results_Bridge', # Specify a results directory
-            'save_vid': False,              # Don't save video from Sports2D by default
-            'save_img': False,              # Don't save images from Sports2D by default
-            'save_pose': True,             # Optionally save TRC files from Sports2D
-            'save_angles': True,            # Optionally save MOT files from Sports2D
-        },
-        'pose': {
-            'det_frequency': 5,             # Example: run detection less frequently
-        },
-        # 'logging': { # Control Sports2D's internal logging if needed, but we set use_custom_logging to False
-        # 'use_custom_logging': False 
-        # }
-    }
-    
+    config_file_path = 'config_unity_bridge.toml'
+    loaded_config_overrides = {}
+    try:
+        with open(config_file_path, 'r') as f:
+            loaded_config_overrides = toml.load(f)
+        logging.info(f"Successfully loaded bridge config from {config_file_path}")
+    except FileNotFoundError:
+        logging.error(f"ERROR: Bridge configuration file '{config_file_path}' not found. Using default bridge overrides.")
+        # Fallback to some essential defaults if file not found, or you could make it mandatory
+        loaded_config_overrides = {
+            'base': {
+                'video_input': 'webcam',
+                'show_realtime_results': False,
+                'disable_internal_data_accumulation': True,
+                'person_ordering_method': 'first_detected',
+                'save_pose': False,
+                'save_angles': False
+            },
+            'post-processing': {
+                'interpolate': False, 
+                'filter': False,
+                'show_graphs': False
+            }
+        }
+    except toml.TomlDecodeError as e:
+        logging.error(f"ERROR: Could not decode bridge configuration file '{config_file_path}': {e}. Using default bridge overrides.")
+        # Fallback similarly
+        loaded_config_overrides = {
+            'base': {
+                'video_input': 'webcam',
+                'show_realtime_results': False,
+                'disable_internal_data_accumulation': True,
+                'person_ordering_method': 'first_detected',
+                'save_pose': False,
+                'save_angles': False
+            },
+            'post-processing': {
+                'interpolate': False, 
+                'filter': False,
+                'show_graphs': False
+            }
+        }
+
     logging.info("Starting Sports2D with Unity Bridge...")
-    process_with_unity(our_config_overrides)
+    process_with_unity(loaded_config_overrides)
